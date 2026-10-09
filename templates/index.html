@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touch Grass: Treasure Hunt</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; text-align: center; background: #1a1a1a; color: #f4d03f; padding: 20px; }
+        .screen { display: none; }
+        .active { display: block; }
+        h1 { font-size: 2em; }
+        button { background: #8b0000; color: white; padding: 15px 30px; font-size: 1.2em; border-radius: 10px; cursor: pointer; margin: 10px; border: 2px solid #f4d03f; }
+        button:hover { background: #a52a2a; }
+        .dashboard { background: #333; padding: 20px; border-radius: 10px; margin-top: 20px; border: 1px dashed #f4d03f; }
+        #ai-message { color: #00ffcc; font-size: 1.2em; font-style: italic; margin-top: 15px; min-height: 50px; }
+        .small-btn { background: #555; font-size: 0.9em; padding: 10px 20px; margin-top: 20px; border-color: #777; }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: MENU -->
+    <div id="menu-screen" class="screen">
+        <h1>🏴‍☠️ Open Treasure Hunt</h1>
+        <p>Select your role for this device:</p>
+        <button onclick="lockRole('protector')">🛡️ Protector (Hide)</button>
+        <button onclick="lockRole('pirate')">⚔️ Pirate (Hunt)</button>
+    </div>
+
+    <!-- SCREEN 2: GAME DASHBOARD -->
+    <div id="game-screen" class="screen">
+        <h1 id="role-title">Dashboard</h1>
+        <div class="dashboard">
+            <p><strong>Status:</strong> <span id="gps-status">Locating satellites...</span></p>
+            <p><strong>Distance:</strong> <span id="distance">--</span> meters</p>
+            <p><strong>Terrain:</strong> <span id="geography">--</span></p>
+            <hr>
+            <p id="ai-message">Awaiting AI Game Master...</p>
+        </div>
+        <!-- New Reset Button -->
+        <button class="small-btn" onclick="resetRole()">🔄 Change Role / Quit</button>
+    </div>
+
+    <script>
+        let myRole = localStorage.getItem('treasure_role');
+        let watchId = null;
+
+        // Initialize App
+        if (myRole) {
+            startGame(myRole);
+        } else {
+            document.getElementById('menu-screen').classList.add('active');
+        }
+
+        function lockRole(role) {
+            localStorage.setItem('treasure_role', role);
+            startGame(role);
+        }
+
+        function startGame(role) {
+            myRole = role;
+            document.getElementById('menu-screen').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+            
+            document.getElementById('role-title').innerText = role === 'protector' ? '🛡️ Protector HQ' : '⚔️ Pirate Tracker';
+            
+            // Request Live GPS
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    position => sendLocation(position.coords.latitude, position.coords.longitude),
+                    error => document.getElementById('gps-status').innerText = "GPS Error: " + error.message,
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
+            } else {
+                document.getElementById('gps-status').innerText = "GPS not supported on this device.";
+            }
+        }
+
+        function sendLocation(lat, lon) {
+            document.getElementById('gps-status').innerText = "GPS Active (Live)";
+            
+            fetch('/update_location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: myRole, lat: lat, lon: lon })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('distance').innerText = data.distance;
+                document.getElementById('geography').innerText = data.geography;
+                document.getElementById('ai-message').innerText = `"${data.ai_message}"`;
+            })
+            .catch(err => console.error("Network error:", err));
+        }
+
+        // New function to clear memory and return to menu
+        function resetRole() {
+            localStorage.removeItem('treasure_role');
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            location.reload(); // Reloads the page to cleanly reset all state
+        }
+    </script>
+</body>
+</html>
